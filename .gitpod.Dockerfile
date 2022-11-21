@@ -15,6 +15,7 @@ RUN ghcup install ghc 8.10.7
 RUN ghcup install hls
 RUN ghcup install stack
 RUN ghcup install cabal
+RUN ghcup set ghc 8.10.7
 
 # change stack's configuration to use system installed ghc.
 # By default, stack tool will download its own version of the compiler,
