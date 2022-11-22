@@ -3,19 +3,17 @@ FROM gitpod/workspace-base
 # Install dependencies
 RUN sudo apt-get install -y build-essential curl libffi-dev libffi7 libgmp-dev libgmp10 libncurses-dev libncurses5 libtinfo5
 
-# ghcup is a replacement for the haskell platform. It manages the development env easily. 
-# We use the official instalation script
-RUN sudo curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org | sh
-
-# Add ghcup to path
-ENV PATH=${PATH}:${HOME}/.ghcup/bin
+RUN mkdir -p "$HOME/.ghcup/bin" \
+    && curl -LJ "https://downloads.haskell.org/~ghcup/x86_64-linux-ghcup" -o "$HOME/.ghcup/bin/ghcup" \
+    && chmod +x "$HOME/.ghcup/bin/ghcup"
+ENV PATH="/home/$USERNAME/.cabal/bin:/home/$USERNAME/.ghcup/bin:$PATH"
 
 # Set up the environment. This will install the default versions of every tool.
-RUN ghcup install ghc 8.10.7
-RUN ghcup install hls
-RUN ghcup install stack
-RUN ghcup install cabal
-RUN ghcup set ghc 8.10.7
+RUN ghcup install ghc 8.10.7 --set 
+RUN ghcup install stack recommended --set
+RUN ghcup install cabal recommended --set
+RUN ghcup install hls recommended --set
+RUN cabal update
 
 # change stack's configuration to use system installed ghc.
 # By default, stack tool will download its own version of the compiler,
