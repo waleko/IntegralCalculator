@@ -25,7 +25,7 @@ source-repository head
 
 library
   exposed-modules:
-      Evaluator
+      LatexParser
       Lib
   other-modules:
       Paths_IntegralCalculator
