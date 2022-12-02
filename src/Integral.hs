@@ -1,6 +1,6 @@
 {-# LANGUAGE InstanceSigs #-}
 
-module Lib where
+module Integral where
 
 type Func = Double -> Double
 
@@ -33,7 +33,7 @@ partition (Bounds MinusInfinity (Val up)) n = partition (Bounds (Val $ up - from
 partition (Bounds MinusInfinity PlusInfinity) n = partition (Bounds (Val $ - fromIntegral n) (Val $ fromIntegral n)) n
 partition (Bounds MinusInfinity MinusInfinity) _ = Partition [] 0
 partition (Bounds PlusInfinity PlusInfinity) _ = Partition [] 0
-partition b n = Partition (reverse holder) (-delta)
+partition b n = Partition (reverse $ map (+delta) holder) (-delta)
   where
     (Partition holder delta) = partition (reverseBounds b) n
 
