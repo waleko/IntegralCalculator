@@ -1,0 +1,14 @@
+on: [push]
+name: "IntegralCalculator Haskell App"
+jobs:
+  test:
+    name: HUnit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: haskell/actions/setup@v2
+        with:
+          ghc-version: '8.10.7'
+          enable-stack: true
+          stack-version: 'latest'
+      - run: stack test --coverage
