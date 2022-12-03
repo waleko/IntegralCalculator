@@ -40,6 +40,7 @@ partition b n = Partition (reverse $ map (+delta) holder) (-delta)
 data Strategy = Rectangle | Trapezoid | Paraboloid deriving (Show, Eq)
 
 newtype ResultWithSteps a = ResultWithSteps {resultWithSteps :: (a, Int)}
+type FuncWithSteps = Double -> ResultWithSteps Double
 
 instance Functor ResultWithSteps where
   fmap :: (a -> b) -> ResultWithSteps a -> ResultWithSteps b
@@ -55,17 +56,41 @@ instance Monad ResultWithSteps where
   (>>=) :: ResultWithSteps a -> (a -> ResultWithSteps b) -> ResultWithSteps b
   (>>=) (ResultWithSteps m1) k = ResultWithSteps $ let (inter, steps1) = m1 in let (ResultWithSteps (res, steps2)) = k inter in (res, steps1 + steps2)
 
-unit :: a -> Int -> ResultWithSteps a
-unit x steps = ResultWithSteps (x, steps)
+instance Num a => Num (ResultWithSteps a) where
+  (+) x1 x2 = (+) <$> x1 <*> x2
+  (*) x1 x2 = (*) <$> x1 <*> x2
+  abs = fmap abs
+  signum = fmap signum
+  fromInteger x = pure (fromInteger x)
+  negate = fmap negate
+instance Fractional a => Fractional (ResultWithSteps a) where
+  fromRational x = pure (fromRational x)
+  recip = fmap recip
 
--- -- TODO: improper + diverging
-evalWithN :: Strategy -> Partition -> Func -> Int -> ResultWithSteps Double
-evalWithN Rectangle (Partition xs delta) f n = unit (sum [f (x + delta / 2) | x <- xs] * delta) n
-evalWithN Trapezoid (Partition xs delta) f n = unit (sum [(f x + f (x + delta)) / 2 | x <- xs] * delta) n
-evalWithN Paraboloid bounds f n = do
-  x <- evalWithN Trapezoid bounds f (2 * n)
-  y <- evalWithN Trapezoid bounds f n
-  return $ (4 * x - y) / 3
+unit :: a -> ResultWithSteps a
+unit x = ResultWithSteps (x, 1)
+
+meanFHelper :: Double -> Double -> Double -> Func -> FuncWithSteps
+meanFHelper prev eps gamma f x = do
+  y1 <- unit $ f (x - eps)
+  y2 <- unit $ f (x + eps)
+  let val = (y1 + y2) / 2
+  let delta = abs (val - prev)
+  if delta < gamma
+    then return val
+    else meanFHelper val (eps / 2) gamma f x
+
+meanF :: Double -> Func -> FuncWithSteps
+meanF gamma f x = do
+  y0 <- unit $ f x
+  if abs y0 /= 1/0 && y0 == y0 -- infinity and NaN check
+    then return y0
+    else meanFHelper (1/0) (gamma / 10) gamma f x
+
+evalWithN :: Strategy -> Partition -> FuncWithSteps -> ResultWithSteps Double
+evalWithN Rectangle (Partition xs delta) f = sum [f (x + delta / 2) | x <- xs] * pure delta
+evalWithN Trapezoid (Partition xs delta) f = sum [(f x + f (x + delta)) / pure 2 | x <- xs] * pure delta
+evalWithN Paraboloid bounds f = (4 * evalWithN Trapezoid bounds f - evalWithN Trapezoid bounds f) / pure 3
 
 data IntegralProps = IntegralProps
   { strategy :: Strategy,
@@ -93,7 +118,10 @@ eval (IntegralProps strategy maxError) bounds func = do
   where
     evalHelper :: Double -> Double -> Int -> ResultWithSteps (Either IntegralError Double)
     evalHelper prev prevDelta n = do
-      val <- evalWithN strategy (partition bounds n) func n
+      let partitioned = partition bounds n
+      let gamma = delta partitioned / fromIntegral n / 4
+      let wfunc = meanF gamma func
+      val <- evalWithN strategy partitioned wfunc
       let delta = abs (val - prev)
       if delta < maxError && n >= 4
         then return (Right val)
