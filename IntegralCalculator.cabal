@@ -26,7 +26,6 @@ source-repository head
 library
   exposed-modules:
       Integral
-      LatexParser
   other-modules:
       Paths_IntegralCalculator
   hs-source-dirs:
@@ -39,13 +38,19 @@ library
 executable IntegralCalculator-exe
   main-is: Main.hs
   other-modules:
+      LatexParser
       Paths_IntegralCalculator
   hs-source-dirs:
       app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
-      IntegralCalculator
+      HaTeX
+    , IntegralCalculator
     , base >=4.7 && <5
+    , hint
+    , optparse-applicative
+    , texmath
+    , text
   default-language: Haskell2010
 
 test-suite IntegralCalculator-test

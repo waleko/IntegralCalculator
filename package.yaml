@@ -46,6 +46,11 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - IntegralCalculator
+    - optparse-applicative
+    - HaTeX
+    - text
+    - texmath
+    - hint
 
 tests:
   IntegralCalculator-test:
