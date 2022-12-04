@@ -17,7 +17,7 @@ main = do
         (actionParser <**> helper)
         ( fullDesc
             <> progDesc "This application helps to calculate definite integrals of one variable over the real line. Improper integrals, infinite boundaries, diverging integrals are supported."
-            <> header "Simple integral calculator in Haskell"
+            <> header "calcigral: Simple integral calculator in Haskell"
         )
 
 -- Тип входных данных
@@ -34,7 +34,7 @@ actionParser = Action <$> boundsParser <*> inputParser <*> maxErrorParser <*> st
 
 -- Парсер аргумента, специфицирующий, откуда брать входные данные
 inputParser :: Parser Input
-inputParser = StrInput <$> strArgument (metavar "STRING" <> help "Integral formula")
+inputParser = StrInput <$> strArgument (metavar "FORMULA" <> help "Integral formula")
 
 
 doubleArgument :: Mod ArgumentFields Double -> Parser Double
@@ -51,7 +51,7 @@ boundArgument :: Mod ArgumentFields (Bound Double) -> Parser (Bound Double)
 boundArgument = argument $ readBound <$> readerAsk
 
 boundsParser :: Parser BoundsInput
-boundsParser = StrBoundsInput <$> (Bounds <$> boundArgument (metavar "UPPER_BOUND" <> help "Upper bound of the integral") <*> boundArgument (metavar "LOWER_BOUND" <> help "Lower bound of the integral"))
+boundsParser = StrBoundsInput <$> (Bounds <$> boundArgument (metavar "LOWER_BOUND" <> help "Lower bound of the integral") <*> boundArgument (metavar "UPPER_BOUND" <> help "Upper bound of the integral"))
 maxErrorParser :: Parser MaxErrorInput
 maxErrorParser = StrMaxErrorInput <$> doubleArgument (metavar "MAX_ERROR" <> help "Maximum absolute error for the calculation")
 

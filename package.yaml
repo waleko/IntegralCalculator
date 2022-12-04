@@ -1,4 +1,4 @@
-name:                IntegralCalculator
+name:                calcigral
 version:             0.1.0.0
 github:              "waleko/IntegralCalculator"
 license:             BSD3
@@ -37,7 +37,7 @@ library:
   source-dirs: src
 
 executables:
-  IntegralCalculator-exe:
+  calcigral:
     main:                Main.hs
     source-dirs:         app
     ghc-options:
@@ -45,7 +45,7 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
-    - IntegralCalculator
+    - calcigral
     - optparse-applicative
     - HaTeX
     - text
@@ -53,7 +53,7 @@ executables:
     - hint
 
 tests:
-  IntegralCalculator-test:
+  calcigral-test:
     main:                Test.hs
     source-dirs:         test
     ghc-options:
@@ -68,4 +68,4 @@ tests:
     - tasty-hedgehog
     - tasty-hunit
     - tasty-discover
-    - IntegralCalculator
+    - calcigral

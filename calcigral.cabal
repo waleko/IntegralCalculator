@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 
-name:           IntegralCalculator
+name:           calcigral
 version:        0.1.0.0
 description:    Please see the README on GitHub at <https://github.com/waleko/IntegralCalculator#readme>
 homepage:       https://github.com/waleko/IntegralCalculator#readme
@@ -27,7 +27,7 @@ library
   exposed-modules:
       Integral
   other-modules:
-      Paths_IntegralCalculator
+      Paths_calcigral
   hs-source-dirs:
       src
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints
@@ -35,38 +35,38 @@ library
       base >=4.7 && <5
   default-language: Haskell2010
 
-executable IntegralCalculator-exe
+executable calcigral
   main-is: Main.hs
   other-modules:
       LatexParser
-      Paths_IntegralCalculator
+      Paths_calcigral
   hs-source-dirs:
       app
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       HaTeX
-    , IntegralCalculator
     , base >=4.7 && <5
+    , calcigral
     , hint
     , optparse-applicative
     , texmath
     , text
   default-language: Haskell2010
 
-test-suite IntegralCalculator-test
+test-suite calcigral-test
   type: exitcode-stdio-1.0
   main-is: Test.hs
   other-modules:
       Test.Integral
-      Paths_IntegralCalculator
+      Paths_calcigral
   hs-source-dirs:
       test
   ghc-options: -Wall -Wcompat -Widentities -Wincomplete-record-updates -Wincomplete-uni-patterns -Wmissing-export-lists -Wmissing-home-modules -Wpartial-fields -Wredundant-constraints -threaded -rtsopts -with-rtsopts=-N
   build-depends:
       HUnit
     , HUnit-approx
-    , IntegralCalculator
     , base >=4.7 && <5
+    , calcigral
     , hedgehog
     , tasty
     , tasty-discover
