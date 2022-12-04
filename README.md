@@ -1,5 +1,5 @@
 <a href="https://github.com/waleko/IntegralCalculator">
-  <img align="left" height="80px" src=".github/logo.svg">
+  <img align="left" height="80px" src="assets/logo.svg">
 </a>
 <h1 style="display: inline;">
   Calcigral
