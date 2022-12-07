@@ -34,24 +34,38 @@ partition (low, up) n = Partition [low + delta * fromIntegral idx | idx <- [0 ..
 -- | Method of computing the integral
 data Strategy = Rectangle | Trapezoid | Paraboloid deriving (Show, Eq)
 
--- | Value with number of steps required to compute it
-newtype ResultWithSteps a = ResultWithSteps {resultWithSteps :: (a, Int)} deriving (Show, Eq)
+-- | Value with number of steps remaining
+data ValueWithSteps a = ValueWithSteps {valueWithStepsLeft:: (a, Int)} | CancelledValue deriving (Show, Eq)
+-- | Function that gets a result with the given maximum number of steps
+-- | If execution exceeds this number, the value is set as `CancelledValue` and further code is executed
+newtype ResultWithSteps a = ResultWithSteps {runWithLimit :: Int -> ValueWithSteps a}
 
 type FuncWithSteps = Double -> ResultWithSteps Double
 
+instance Functor ValueWithSteps where
+  fmap :: (a -> b) -> ValueWithSteps a -> ValueWithSteps b
+  fmap f (ValueWithSteps (y, steps0)) = ValueWithSteps (f y, steps0)
+  fmap _ CancelledValue = CancelledValue
+
 instance Functor ResultWithSteps where
   fmap :: (a -> b) -> ResultWithSteps a -> ResultWithSteps b
-  fmap f (ResultWithSteps m) = ResultWithSteps $ let (y, steps) = m in (f y, steps)
+  fmap f (ResultWithSteps m) = ResultWithSteps $ \lim -> fmap f (m lim)
 
 instance Applicative ResultWithSteps where
   pure :: a -> ResultWithSteps a
-  pure x = ResultWithSteps (x, 0)
+  pure x = ResultWithSteps $ \lim -> ValueWithSteps (x, lim)
   (<*>) :: ResultWithSteps (a -> b) -> ResultWithSteps a -> ResultWithSteps b
-  (<*>) (ResultWithSteps transform) (ResultWithSteps m1) = ResultWithSteps $ let (f, steps0) = transform in let (y, steps1) = m1 in (f y, steps0 + steps1)
+  (<*>) (ResultWithSteps transform) (ResultWithSteps m1) = ResultWithSteps $
+    \lim -> case transform lim of
+      ValueWithSteps (trFunc, remainingSteps) -> trFunc <$> m1 remainingSteps
+      CancelledValue -> CancelledValue
 
 instance Monad ResultWithSteps where
   (>>=) :: ResultWithSteps a -> (a -> ResultWithSteps b) -> ResultWithSteps b
-  (>>=) (ResultWithSteps m1) k = ResultWithSteps $ let (inter, steps1) = m1 in let (ResultWithSteps (res, steps2)) = k inter in (res, steps1 + steps2)
+  (>>=) (ResultWithSteps m1) k = ResultWithSteps $ \lim -> case m1 lim of
+    ValueWithSteps (val, remainingSteps) -> runWithLimit (k val) remainingSteps
+    CancelledValue -> CancelledValue
+         
 
 instance Num a => Num (ResultWithSteps a) where
   (+) x1 x2 = (+) <$> x1 <*> x2
@@ -75,7 +89,7 @@ instance Num a => Num (Either IntegralError a) where
 
 -- Value with a single step required to compute it
 unit :: a -> ResultWithSteps a
-unit x = ResultWithSteps (x, 1)
+unit x = ResultWithSteps $ \lim -> if lim >= 1 then ValueWithSteps (x, lim - 1) else CancelledValue
 
 -- | Approximate function value if its value is not defined
 infinityHelper :: Int -> Double -> Func -> FuncWithSteps
@@ -119,7 +133,8 @@ evalWithN Paraboloid segment func n = (4 * evalWithN Trapezoid segment func (2 *
 -- | Integral calculation properties
 data IntegralProps = IntegralProps
   { strategy :: Strategy,
-    maxError :: Double
+    maxError :: Double,
+    maxSteps :: Int
   }
   deriving (Show, Eq)
 
@@ -136,21 +151,23 @@ type EvaluationResult = Either IntegralError IntegralResult
 eval :: IntegralProps -> Bounds -> Func -> EvaluationResult
 eval props bounds func = do
   res <- evalMonad props bounds func
-  let (val, steps) = resultWithSteps res
-  return $ IntegralResult val steps
+  let stepsLimit = maxSteps props
+  case runWithLimit res stepsLimit of
+    ValueWithSteps (val, stepsRemaining) -> return $ IntegralResult val (stepsLimit - stepsRemaining)
+    CancelledValue -> Left Diverging
 
 evalMonad :: IntegralProps -> Bounds -> Func -> Either IntegralError (ResultWithSteps Double)
-evalMonad props (Bounds (Val low) (Val up)) func = evalSegment props (low, up) func
-evalMonad props (Bounds (Val low) PlusInfinity) func = do
+evalMonad props (Bounds (Val low) (Val up)) func = Right $ evalSegment props (low, up) func
+evalMonad props (Bounds (Val low) PlusInfinity) func = Right $ do
   -- I = \int_{low}^{+\infty} f
   let g = func . (\x -> x + low - 1) -- I = \int_1^{+\infty} g
   evalSegment props (0, 1) (\x -> g (1 / x) / (x * x)) -- I = \int_0^1 g(1/x) / x^2
 evalMonad props (Bounds MinusInfinity (Val up)) func = evalMonad props (Bounds (Val (- up)) PlusInfinity) func
 evalMonad props (Bounds (Val low) MinusInfinity) func = negate $ evalMonad props (Bounds (Val (- low)) PlusInfinity) func
 evalMonad props (Bounds PlusInfinity (Val up)) func = negate $ evalMonad props (Bounds MinusInfinity (Val (- up))) func
-evalMonad (IntegralProps strategy maxError) (Bounds MinusInfinity PlusInfinity) func = do
+evalMonad (IntegralProps strategy maxError maxSteps) (Bounds MinusInfinity PlusInfinity) func = Right $ do
   -- I = \int_{-\infty}^{+\infty} f
-  let halfProps = IntegralProps strategy (maxError / 2)
+  let halfProps = IntegralProps strategy (maxError / 2) maxSteps
   inside <- evalSegment halfProps (-1, 1) func
   outside <- evalSegment halfProps (-1, 1) (\x -> func (1 / x) / (x * x))
   return $ inside + outside
@@ -159,27 +176,17 @@ evalMonad _ (Bounds MinusInfinity MinusInfinity) _ = Left InvalidBounds
 evalMonad _ (Bounds PlusInfinity PlusInfinity) _ = Left InvalidBounds
 
 -- Calculates the integral on a segment
-evalSegment :: IntegralProps -> (Double, Double) -> Func -> Either IntegralError (ResultWithSteps Double)
-evalSegment (IntegralProps strategy maxError) (low, up) func = do
-  let evaluator = evalHelper 0 0 1
-  let (result, steps) = resultWithSteps evaluator
-  case result of
-    Left ie -> Left ie
-    Right x -> Right $ ResultWithSteps (x, steps)
+evalSegment :: IntegralProps -> (Double, Double) -> Func -> ResultWithSteps Double
+evalSegment (IntegralProps strategy maxError _) (low, up) func = do
+  evalHelper 0 1
   where
-    evalHelper :: Double -> Double -> Int -> ResultWithSteps (Either IntegralError Double)
-    evalHelper prev prevDelta n = do
+    evalHelper :: Double -> Int -> ResultWithSteps Double
+    evalHelper prev n = do
       -- get integral value for n
       val <- evalWithN strategy (low, up) func n
       -- compare with previous value
       let delta = abs (val - prev)
       -- by using the Runge rule (https://ru.wikipedia.org/wiki/Правило_Рунге), decide whether to continue
-      if delta < maxError && n >= minimumDecisionN
-        then return (Right val)
-        else
-          if delta > prevDelta && n >= minimumDecisionN
-            then return (Left Diverging)
-            else evalHelper val delta (2 * n)
-
-minimumDecisionN :: Int
-minimumDecisionN = 20
+      if delta < maxError && n > 1
+        then return val
+        else evalHelper val (2 * n)
