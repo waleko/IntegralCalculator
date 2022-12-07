@@ -70,7 +70,7 @@ Diverging
 ```
 
 ## Goals of this project
-This utility is a educational project for the JetBrains Functional Programming course (Fall 2022) at Constructor University</a>. Hence, the goals of this project are educational.
+This utility is a educational project for the JetBrains Functional Programming course (Fall 2022) at Constructor University. Hence, the goals of this project are educational.
 
 ## License
 This project is [BSD-3-Clause](./LICENSE) licensed
