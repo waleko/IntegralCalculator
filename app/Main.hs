@@ -1,11 +1,11 @@
 module Main (main) where
 
-import Integral
-import Options.Applicative
-import Options.Applicative.Types
-import qualified Language.Haskell.Interpreter as Hint
 import Data.Text (toLower)
 import qualified Data.Text as T
+import Integral
+import qualified Language.Haskell.Interpreter as Hint
+import Options.Applicative
+import Options.Applicative.Types
 
 main :: IO ()
 main = do
@@ -26,7 +26,9 @@ data Input
   deriving (Show)
 
 data BoundsInput = StrBoundsInput Bounds deriving (Show)
+
 data MaxErrorInput = StrMaxErrorInput Double deriving (Show)
+
 data StrategyInput = StrStrategyInput (Either () Strategy) deriving (Show)
 
 actionParser :: Parser Action
@@ -35,7 +37,6 @@ actionParser = Action <$> boundsParser <*> inputParser <*> maxErrorParser <*> st
 -- Парсер аргумента, специфицирующий, откуда брать входные данные
 inputParser :: Parser Input
 inputParser = StrInput <$> strArgument (metavar "FORMULA" <> help "Integral formula")
-
 
 doubleArgument :: Mod ArgumentFields Double -> Parser Double
 doubleArgument = argument $ read <$> readerAsk
@@ -47,11 +48,13 @@ readBound str
   | str == "MinusInfinity" || str == "-\\infty" || str == "-∞" =
     MinusInfinity
   | otherwise = Val $ read str
+
 boundArgument :: Mod ArgumentFields (Bound Double) -> Parser (Bound Double)
 boundArgument = argument $ readBound <$> readerAsk
 
 boundsParser :: Parser BoundsInput
 boundsParser = StrBoundsInput <$> (Bounds <$> boundArgument (metavar "LOWER_BOUND" <> help "Lower bound of the integral") <*> boundArgument (metavar "UPPER_BOUND" <> help "Upper bound of the integral"))
+
 maxErrorParser :: Parser MaxErrorInput
 maxErrorParser = StrMaxErrorInput <$> doubleArgument (metavar "MAX_ERROR" <> help "Maximum absolute error for the calculation")
 
@@ -64,15 +67,16 @@ readStrategy str
   | otherwise = error $ "unknown strategy: " ++ str
 
 strategyParser :: Parser StrategyInput
-strategyParser = StrStrategyInput <$> (option $ readStrategy <$> readerAsk) (long "strategy" <> short 's' <> metavar "STRATEGY" <> help "Utilized calculation strategy" <> Options.Applicative.value (Left ()))
+strategyParser = StrStrategyInput <$> (option $ readStrategy <$> readerAsk) (long "strategy" <> short 's' <> metavar "STRATEGY" <> help "Utilized calculation strategy (possible values: Rectangle | Trapezoid | Paraboloid | All)" <> Options.Applicative.value (Left ()))
 
 -- Тип данных, агрегирующий все аргументы командной строки, возвращается actionParser-ом
-data Action = Action {
-    boundsInput :: BoundsInput,
+data Action = Action
+  { boundsInput :: BoundsInput,
     input :: Input,
     maxError :: MaxErrorInput,
     strategy :: StrategyInput
-} deriving (Show)
+  }
+  deriving (Show)
 
 parseFunc :: String -> IO (Either Hint.InterpreterError Func)
 parseFunc s = Hint.runInterpreter $ do
@@ -85,7 +89,6 @@ report res = do
     Left ie -> print ie
     Right ir -> print ir
 
-
 -- Основная функция приложения
 runAction :: Action -> IO ()
 runAction (Action (StrBoundsInput bounds) (StrInput input) (StrMaxErrorInput maxError) (StrStrategyInput strategy_)) = do
@@ -94,12 +97,12 @@ runAction (Action (StrBoundsInput bounds) (StrInput input) (StrMaxErrorInput max
     Left ie -> print ie
     Right f -> case strategy_ of
       Left _ -> do
-          testStrategy Rectangle
-          testStrategy Trapezoid
-          testStrategy Paraboloid
+        testStrategy Rectangle
+        testStrategy Trapezoid
+        testStrategy Paraboloid
       Right strategy -> do
-        testStrategy strategy  
-      where 
+        testStrategy strategy
+      where
         testStrategy strategy = do
           putStrLn $ "Strategy: " ++ show strategy
           report $ eval (IntegralProps strategy maxError) bounds f
