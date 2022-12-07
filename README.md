@@ -23,6 +23,13 @@
 ## What is Calcigral
 Calcigral is a simple command-line utility for approximating the value of definite integrals with one variable over a real line.
 
+## Features
+* Three approximation strategies: `Rectangle`, `Trapezoid`, `Paraboloid`
+* Can approximate up to any absolute error
+* Supports $-\infty$, $+\infty$ approximation bounds
+* Function input: any haskell function using `Prelude`
+* Command-line interface
+
 ## Examples
 ### Simple
 Evaluate $I = \int \limits_0^1 \sin(x) dx = 1 - \cos 1 \approx 0.45969...$
@@ -61,13 +68,6 @@ Strategy: Rectangle
 Diverging
 ===
 ```
-
-## Features
-* Three approximation strategies: `Rectangle`, `Trapezoid`, `Paraboloid`
-* Can approximate up to any absolute error
-* Supports $-\infty$, $+\infty$ approximation bounds
-* Function input: any haskell function using `Prelude`
-* Command-line interface
 
 ## Goals of this project
 This utility is a educational project for the JetBrains Functional Programming course (Fall 2022) at Constructor University</a>. Hence, the goals of this project are educational.
