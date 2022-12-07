@@ -47,9 +47,7 @@ executables:
     dependencies:
     - calcigral
     - optparse-applicative
-    - HaTeX
     - text
-    - texmath
     - hint
 
 tests:
