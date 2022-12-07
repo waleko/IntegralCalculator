@@ -1,4 +1,5 @@
 {-# LANGUAGE InstanceSigs #-}
+{-# LANGUAGE FlexibleInstances #-}
 
 module Integral where
 
@@ -13,33 +14,19 @@ data Bounds = Bounds
     upper :: Bound Double
   } deriving (Show, Eq)
 
-reverseBounds :: Bounds -> Bounds
-reverseBounds (Bounds low up) = Bounds up low
-checkBounds :: Bounds -> Either IntegralError ()
-checkBounds (Bounds MinusInfinity MinusInfinity) = Left InvalidBounds
-checkBounds (Bounds PlusInfinity PlusInfinity) = Left InvalidBounds
-checkBounds _ = Right ()
 data Partition = Partition {
   holder :: [Double],
-  delta :: Double
+  step :: Double
 } deriving (Show, Eq)
 
-partition :: Bounds -> Int -> Partition
-partition (Bounds (Val low) (Val up)) n = Partition [low + delta * fromIntegral idx | idx <- [0 .. (n - 1)]] delta
+partition :: (Double, Double) -> Int -> Partition
+partition (low, up) n = Partition [low + delta * fromIntegral idx | idx <- [0 .. (n - 1)]] delta
   where
       delta = (up - low) / fromIntegral n
-partition (Bounds (Val low) PlusInfinity) n = partition (Bounds (Val low) (Val $ low + fromIntegral n)) n
-partition (Bounds MinusInfinity (Val up)) n = partition (Bounds (Val $ up - fromIntegral n) (Val up)) n
-partition (Bounds MinusInfinity PlusInfinity) n = partition (Bounds (Val $ - fromIntegral n) (Val $ fromIntegral n)) n
-partition (Bounds MinusInfinity MinusInfinity) _ = Partition [] 0
-partition (Bounds PlusInfinity PlusInfinity) _ = Partition [] 0
-partition b n = Partition (reverse $ map (+delta) holder) (-delta)
-  where
-    (Partition holder delta) = partition (reverseBounds b) n
 
 data Strategy = Rectangle | Trapezoid | Paraboloid deriving (Show, Eq)
 
-newtype ResultWithSteps a = ResultWithSteps {resultWithSteps :: (a, Int)}
+newtype ResultWithSteps a = ResultWithSteps {resultWithSteps :: (a, Int)} deriving (Show, Eq)
 type FuncWithSteps = Double -> ResultWithSteps Double
 
 instance Functor ResultWithSteps where
@@ -63,6 +50,13 @@ instance Num a => Num (ResultWithSteps a) where
   signum = fmap signum
   fromInteger x = pure (fromInteger x)
   negate = fmap negate
+instance Num a => Num (Either IntegralError a) where
+  (+) x1 x2 = (+) <$> x1 <*> x2
+  (*) x1 x2 = (*) <$> x1 <*> x2
+  abs = fmap abs
+  signum = fmap signum
+  fromInteger x = pure (fromInteger x)
+  negate = fmap negate
 instance Fractional a => Fractional (ResultWithSteps a) where
   fromRational x = pure (fromRational x)
   recip = fmap recip
@@ -70,27 +64,33 @@ instance Fractional a => Fractional (ResultWithSteps a) where
 unit :: a -> ResultWithSteps a
 unit x = ResultWithSteps (x, 1)
 
-meanFHelper :: Double -> Double -> Double -> Func -> FuncWithSteps
-meanFHelper prev eps gamma f x = do
-  y1 <- unit $ f (x - eps)
-  y2 <- unit $ f (x + eps)
-  let val = (y1 + y2) / 2
-  let delta = abs (val - prev)
-  if delta < gamma
-    then return val
-    else meanFHelper val (eps / 2) gamma f x
+infinityHelper :: Int -> Double -> Func -> FuncWithSteps
+infinityHelper factor delta f x = do
+  let eps = delta / 10
+  let anchorX = x + eps * fromIntegral factor
+  return $ f anchorX
 
-meanF :: Double -> Func -> FuncWithSteps
-meanF gamma f x = do
+meanF :: (Double, Double) -> Double -> Func -> FuncWithSteps
+meanF (low, up) delta f x = do
   y0 <- unit $ f x
+  let center = (low + up) / 2
+  let factor = if x < center then 1 else (-1)
   if abs y0 /= 1/0 && y0 == y0 -- infinity and NaN check
     then return y0
-    else meanFHelper (1/0) (gamma / 10) gamma f x
+    else infinityHelper factor delta f x
 
-evalWithN :: Strategy -> Partition -> FuncWithSteps -> ResultWithSteps Double
-evalWithN Rectangle (Partition xs delta) f = sum [f (x + delta / 2) | x <- xs] * pure delta
-evalWithN Trapezoid (Partition xs delta) f = sum [(f x + f (x + delta)) / pure 2 | x <- xs] * pure delta
-evalWithN Paraboloid bounds f = (4 * evalWithN Trapezoid bounds f - evalWithN Trapezoid bounds f) / pure 3
+evalWithNHelper :: (FuncWithSteps -> ([Double], Double) -> ResultWithSteps Double) -> (Double, Double) -> Func -> Int -> ResultWithSteps Double
+evalWithNHelper logic segment func n = do
+  let partitioned = partition segment n
+  let xs = holder partitioned
+  let delta = step partitioned
+  let wfunc = meanF segment delta func
+  logic wfunc (xs, delta)
+
+evalWithN :: Strategy -> (Double, Double) -> Func -> Int -> ResultWithSteps Double
+evalWithN Rectangle segment func n = evalWithNHelper (\wfunc (xs, delta) -> sum [wfunc (x + delta / 2) | x <- xs] * pure delta)  segment func n
+evalWithN Trapezoid segment func n = evalWithNHelper (\wfunc (xs, delta) -> sum [(wfunc x + wfunc (x + delta)) / pure 2 | x <- xs] * pure delta)  segment func n
+evalWithN Paraboloid segment func n = (4 * evalWithN Trapezoid segment func (2 * n) - evalWithN Trapezoid segment func n) / pure 3
 
 data IntegralProps = IntegralProps
   { strategy :: Strategy,
@@ -104,28 +104,49 @@ data IntegralResult = IntegralResult
   }
   deriving (Show, Eq)
 
-divergingThresholdN :: Int
-divergingThresholdN = 100
+type EvaluationResult = Either IntegralError IntegralResult
 
-eval :: IntegralProps -> Bounds -> Func -> Either IntegralError IntegralResult
-eval (IntegralProps strategy maxError) bounds func = do
+eval :: IntegralProps -> Bounds -> Func -> EvaluationResult
+eval props bounds func = do
+  res <- evalMonad props bounds func
+  let (val, steps) = resultWithSteps res
+  return $ IntegralResult val steps
+
+evalMonad :: IntegralProps -> Bounds -> Func -> Either IntegralError (ResultWithSteps Double)
+evalMonad props (Bounds (Val low) (Val up)) func = evalSegment props (low, up) func
+evalMonad props (Bounds (Val low) PlusInfinity) func = do -- I = \int_{low}^{+\infty} f
+  let g = func . (\x -> x + low - 1) -- I = \int_1^{+\infty} g
+  evalSegment props (0, 1) (\x -> g (1 / x) / (x * x)) -- I = \int_0^1 g(1/x) / x^2
+evalMonad props (Bounds MinusInfinity (Val up)) func = evalMonad props (Bounds (Val (-up)) PlusInfinity) func
+evalMonad props (Bounds (Val low) MinusInfinity) func = negate $ evalMonad props (Bounds (Val (-low)) PlusInfinity) func
+evalMonad props (Bounds PlusInfinity (Val up)) func = negate $ evalMonad props (Bounds MinusInfinity (Val (-up))) func
+evalMonad (IntegralProps strategy maxError) (Bounds MinusInfinity PlusInfinity) func = do -- I = \int_{-\infty}^{+\infty} f
+  let halfProps = IntegralProps strategy (maxError / 2)
+  inside <- evalSegment halfProps (-1, 1) func
+  outside <- evalSegment halfProps (-1, 1) (\x -> func (1 / x) / (x * x))
+  return $ inside + outside
+evalMonad props (Bounds PlusInfinity MinusInfinity) func = negate $ evalMonad props (Bounds MinusInfinity PlusInfinity) func
+evalMonad _ (Bounds MinusInfinity MinusInfinity) _ = Left InvalidBounds
+evalMonad _ (Bounds PlusInfinity PlusInfinity) _ = Left InvalidBounds
+
+evalSegment :: IntegralProps -> (Double, Double) -> Func -> Either IntegralError (ResultWithSteps Double)
+evalSegment (IntegralProps strategy maxError) (low, up) func = do
   let evaluator = evalHelper 0 0 1
   let (result, steps) = resultWithSteps evaluator
-  _ <- checkBounds bounds
   case result of
     Left ie -> Left ie
-    Right x -> Right $ IntegralResult x steps
+    Right x -> Right $ ResultWithSteps (x, steps)
   where
     evalHelper :: Double -> Double -> Int -> ResultWithSteps (Either IntegralError Double)
     evalHelper prev prevDelta n = do
-      let partitioned = partition bounds n
-      let gamma = delta partitioned / fromIntegral n / 4
-      let wfunc = meanF gamma func
-      val <- evalWithN strategy partitioned wfunc
+      val <- evalWithN strategy (low, up) func n
       let delta = abs (val - prev)
-      if delta < maxError && n >= 4
+      if delta < maxError && n >= minimumDecisionN
         then return (Right val)
         else
-          if n >= divergingThresholdN && delta > prevDelta
+          if delta > prevDelta && n >= minimumDecisionN
             then return (Left Diverging)
             else evalHelper val delta (2 * n)
+
+minimumDecisionN :: Int
+minimumDecisionN = 20
