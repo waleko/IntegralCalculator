@@ -35,7 +35,8 @@ partition (low, up) n = Partition [low + delta * fromIntegral idx | idx <- [0 ..
 data Strategy = Rectangle | Trapezoid | Paraboloid deriving (Show, Eq)
 
 -- | Value with number of steps remaining
-data ValueWithSteps a = ValueWithSteps {valueWithStepsLeft:: (a, Int)} | CancelledValue deriving (Show, Eq)
+data ValueWithSteps a = ValueWithSteps {valueWithStepsLeft :: (a, Int)} | CancelledValue deriving (Show, Eq)
+
 -- | Function that gets a result with the given maximum number of steps
 -- | If execution exceeds this number, the value is set as `CancelledValue` and further code is executed
 newtype ResultWithSteps a = ResultWithSteps {runWithLimit :: Int -> ValueWithSteps a}
@@ -65,7 +66,7 @@ instance Monad ResultWithSteps where
   (>>=) (ResultWithSteps m1) k = ResultWithSteps $ \lim -> case m1 lim of
     ValueWithSteps (val, remainingSteps) -> runWithLimit (k val) remainingSteps
     CancelledValue -> CancelledValue
-         
+
 
 instance Num a => Num (ResultWithSteps a) where
   (+) x1 x2 = (+) <$> x1 <*> x2
@@ -163,17 +164,15 @@ evalMonad props (Bounds (Val low) PlusInfinity) func = Right $ do
   let g = func . (\x -> x + low - 1) -- I = \int_1^{+\infty} g
   evalSegment props (0, 1) (\x -> g (1 / x) / (x * x)) -- I = \int_0^1 g(1/x) / x^2
 evalMonad props (Bounds MinusInfinity (Val up)) func = evalMonad props (Bounds (Val (- up)) PlusInfinity) func
-evalMonad props (Bounds (Val low) MinusInfinity) func = negate $ evalMonad props (Bounds (Val (- low)) PlusInfinity) func
-evalMonad props (Bounds PlusInfinity (Val up)) func = negate $ evalMonad props (Bounds MinusInfinity (Val (- up))) func
 evalMonad (IntegralProps strategy maxError maxSteps) (Bounds MinusInfinity PlusInfinity) func = Right $ do
   -- I = \int_{-\infty}^{+\infty} f
   let halfProps = IntegralProps strategy (maxError / 2) maxSteps
   inside <- evalSegment halfProps (-1, 1) func
   outside <- evalSegment halfProps (-1, 1) (\x -> func (1 / x) / (x * x))
   return $ inside + outside
-evalMonad props (Bounds PlusInfinity MinusInfinity) func = negate $ evalMonad props (Bounds MinusInfinity PlusInfinity) func
 evalMonad _ (Bounds MinusInfinity MinusInfinity) _ = Left InvalidBounds
 evalMonad _ (Bounds PlusInfinity PlusInfinity) _ = Left InvalidBounds
+evalMonad props (Bounds l r) func = negate $ evalMonad props (Bounds r l) func
 
 -- Calculates the integral on a segment
 evalSegment :: IntegralProps -> (Double, Double) -> Func -> ResultWithSteps Double

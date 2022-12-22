@@ -1,10 +1,12 @@
 module Test.Integral where
 
 import Integral
-import Test.HUnit (Assertion, assertEqual, assertFailure)
 import Test.HUnit.Approx (assertApproxEqual)
+import Test.Tasty
+import Test.Tasty.HUnit
 
 defaultEps = 0.001
+
 defaultMaxSteps = 10000
 
 checkEvalHelper :: String -> Either IntegralError Double -> IntegralProps -> Bounds -> Func -> Assertion
@@ -35,9 +37,16 @@ unit_simple = do
 
 unit_diverging :: Assertion
 unit_diverging = do
-  checkEval (Bounds (Val 0) PlusInfinity) (1 /) (Left Diverging) defaultEps defaultMaxSteps  -- delta does not approach 0, so it doesn't detect divergence :(
+  checkEval (Bounds (Val 0) PlusInfinity) (1 /) (Left Diverging) defaultEps defaultMaxSteps
   checkEval (Bounds (Val 0) (Val 1)) (\x -> 1 / (x * x)) (Left Diverging) defaultEps defaultMaxSteps
 
 unit_invalid_bounds :: Assertion
 unit_invalid_bounds = do
   checkEval (Bounds MinusInfinity MinusInfinity) id (Left InvalidBounds) defaultEps defaultMaxSteps
+
+unitTests :: [TestTree]
+unitTests =
+  [ testCase "Simple integral calculation" unit_simple,
+    testCase "Diverging integral" unit_diverging,
+    testCase "Invalid bounds" unit_invalid_bounds
+  ]

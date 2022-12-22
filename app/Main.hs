@@ -38,7 +38,7 @@ actionParser = Action <$> boundsParser <*> inputParser <*> maxErrorParser <*> st
 
 -- Парсер аргумента, специфицирующий, откуда брать входные данные
 inputParser :: Parser Input
-inputParser = StrInput <$> strArgument (metavar "FORMULA" <> help "Integral formula")
+inputParser = StrInput <$> strArgument (metavar "FORMULA" <> help "Integral function (given as a haskell function). Example: sin, cos, \\x -> x * x * 3, \\t -> t * sin t")
 
 doubleArgument :: Mod ArgumentFields Double -> Parser Double
 doubleArgument = argument $ read <$> readerAsk
@@ -55,12 +55,12 @@ boundArgument :: Mod ArgumentFields (Bound Double) -> Parser (Bound Double)
 boundArgument = argument $ readBound <$> readerAsk
 
 boundsParser :: Parser BoundsInput
-boundsParser = StrBoundsInput <$> (Bounds <$> boundArgument (metavar "LOWER_BOUND" <> help "Lower bound of the integral") <*> boundArgument (metavar "UPPER_BOUND" <> help "Upper bound of the integral"))
+boundsParser = StrBoundsInput <$> (Bounds <$> boundArgument (metavar "LOWER_BOUND" <> help "Lower bound of the integral. Example: -21.2, 0, MinusInfinity") <*> boundArgument (metavar "UPPER_BOUND" <> help "Upper bound of the integral. Example: 1, 3.43, PlusInfinity"))
 
 maxErrorParser :: Parser MaxErrorInput
 maxErrorParser = StrMaxErrorInput <$> doubleArgument (metavar "MAX_ERROR" <> help "Maximum absolute error for the calculation (default: 1e-3)" <> Options.Applicative.value 0.001)
 
-readStrategy :: String -> (Either () Strategy)
+readStrategy :: String -> Either () Strategy
 readStrategy str
   | toLower (T.pack str) == T.pack "rectangle" = Right Rectangle
   | toLower (T.pack str) == T.pack "trapezoid" = Right Trapezoid

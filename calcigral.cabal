@@ -55,6 +55,7 @@ test-suite calcigral-test
   main-is: Test.hs
   other-modules:
       Test.Integral
+      Test.Steps
       Paths_calcigral
   hs-source-dirs:
       test
