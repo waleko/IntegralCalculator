@@ -93,11 +93,11 @@ unit :: a -> ResultWithSteps a
 unit x = ResultWithSteps $ \lim -> if lim >= 1 then ValueWithSteps (x, lim - 1) else CancelledValue
 
 -- | Approximate function value if its value is not defined
-infinityHelper :: Int -> Double -> Func -> FuncWithSteps
-infinityHelper factor delta f x = do
+infinityHelper :: Double -> Func -> FuncWithSteps
+infinityHelper delta f x = do
   -- offset
   let eps = delta / 10 -- no theoretical explanation, why it's 10
-  return $ f (x + eps * fromIntegral factor)
+  return $ (f (x - eps) + f (x + eps)) / 2
 
 -- | Fixes breakpoints of an integrable function
 wrapperFunc :: (Double, Double) -> Double -> Func -> FuncWithSteps
@@ -110,7 +110,7 @@ wrapperFunc (low, up) delta f x = do
   let res
         | abs y0 /= 1 / 0 && y0 == y0 = return y0 -- infinity and NaN check
         | y0 == low || y0 == up = return $ 2 * f (x + delta * fromIntegral factor) - f (x + delta * 2 * fromIntegral factor)
-        | otherwise = infinityHelper factor delta f x
+        | otherwise = infinityHelper delta f x
   res
 
 -- | Common helper function for Rectangle and Trapezoid strategies
@@ -174,6 +174,9 @@ evalMonad _ (Bounds MinusInfinity MinusInfinity) _ = Left InvalidBounds
 evalMonad _ (Bounds PlusInfinity PlusInfinity) _ = Left InvalidBounds
 evalMonad props (Bounds l r) func = negate $ evalMonad props (Bounds r l) func
 
+minimumDecisionN :: Int
+minimumDecisionN = 5
+
 -- Calculates the integral on a segment
 evalSegment :: IntegralProps -> (Double, Double) -> Func -> ResultWithSteps Double
 evalSegment (IntegralProps strategy maxError _) (low, up) func = do
@@ -186,6 +189,6 @@ evalSegment (IntegralProps strategy maxError _) (low, up) func = do
       -- compare with previous value
       let delta = abs (val - prev)
       -- by using the Runge rule (https://ru.wikipedia.org/wiki/Правило_Рунге), decide whether to continue
-      if delta < maxError && n > 1
+      if delta * 2 < maxError && n >= minimumDecisionN
         then return val
         else evalHelper val (2 * n)
