@@ -174,21 +174,25 @@ evalMonad _ (Bounds MinusInfinity MinusInfinity) _ = Left InvalidBounds
 evalMonad _ (Bounds PlusInfinity PlusInfinity) _ = Left InvalidBounds
 evalMonad props (Bounds l r) func = negate $ evalMonad props (Bounds r l) func
 
-minimumDecisionN :: Int
-minimumDecisionN = 5
+initN :: Int
+initN = 10
+
+converaganceInARowThreshold :: Int
+converaganceInARowThreshold = 3
 
 -- Calculates the integral on a segment
 evalSegment :: IntegralProps -> (Double, Double) -> Func -> ResultWithSteps Double
 evalSegment (IntegralProps strategy maxError _) (low, up) func = do
-  evalHelper 0 1
+  evalHelper 0 0 initN
   where
-    evalHelper :: Double -> Int -> ResultWithSteps Double
-    evalHelper prev n = do
+    evalHelper :: Double -> Int -> Int -> ResultWithSteps Double
+    evalHelper prev convInARow n = do
       -- get integral value for n
       val <- evalWithN strategy (low, up) func n
       -- compare with previous value
       let delta = abs (val - prev)
       -- by using the Runge rule (https://ru.wikipedia.org/wiki/Правило_Рунге), decide whether to continue
-      if delta * 2 < maxError && n >= minimumDecisionN
+      let nextConv = if delta * 2 < maxError then convInARow + 1 else 0
+      if nextConv >= converaganceInARowThreshold
         then return val
-        else evalHelper val (2 * n)
+        else evalHelper val nextConv (2 * n)

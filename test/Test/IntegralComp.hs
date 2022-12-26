@@ -10,9 +10,9 @@ import Test.Tasty
 import Test.Tasty.Hedgehog
 
 data BinaryOp = Sum | Mul | Div deriving (Show)
+
 data UnaryOp = Negate | Sqrt | Sin | Cos deriving (Show)
 
--- | Binary tree of unit operations. Each leaf returns a number.
 data Expr a = X | Val a | UnaryOpExpr UnaryOp (Expr a) | BinaryOpExpr BinaryOp (Expr a) (Expr a) deriving (Show)
 
 makeUnary :: MonadGen m => Expr a -> m (Expr a)
@@ -25,7 +25,7 @@ makeBinary e1 e2 = do
   op <- Gen.element [Sum, Mul, Div]
   return $ BinaryOpExpr op e1 e2
 
--- | Generator for op trees
+-- | Generator of expressions
 genExpr :: MonadGen m => m (Expr Double)
 genExpr =
   Gen.recursive
@@ -37,7 +37,7 @@ genExpr =
       Gen.subtermM2 genExpr genExpr makeBinary
     ]
 
--- | Unwraps the tree into a monad
+-- | converts expression to function
 convertToFunc :: Expr Double -> Double -> Double
 convertToFunc X x = x
 convertToFunc (Test.IntegralComp.Val v) _ = v
@@ -62,23 +62,23 @@ testEval maxError maxSteps lowerB upperB func strategy = Integral.eval (Integral
 compareEvaluationResult :: MonadTest m => Double -> EvaluationResult -> EvaluationResult -> m ()
 compareEvaluationResult _ (Left err1) (Left err2) = err1 === err2
 compareEvaluationResult maxError (Right (IntegralResult val1 _)) (Right (IntegralResult val2 _)) = do
-    let diff = abs $ val1 - val2
-    footnoteShow diff
-    assert $ diff <= 2 * maxError
+  let diff = abs $ val1 - val2
+  footnoteShow diff
+  assert $ diff <= 2 * maxError
 compareEvaluationResult _ (Left Diverging) (Right (IntegralResult _ _)) = success -- different methods may outperform each other, therefore failing by maxSteps
 compareEvaluationResult _ (Right (IntegralResult _ _)) (Left Diverging) = success -- different methods may outperform each other, therefore failing by maxSteps
 compareEvaluationResult _ _ _ = failure
 
 prop_cmp :: Property
 prop_cmp = property $ do
-  -- generates the op tree
+  -- generate formula
   expr <- forAll genExpr
   let func = convertToFunc expr
 
   lowerB <- forAll $ Gen.choice [Integral.Val <$> Gen.double (Range.constantFrom (-10) (-100) 100), pure MinusInfinity, pure PlusInfinity]
   upperB <- forAll $ Gen.choice [Integral.Val <$> Gen.double (Range.constantFrom 10 (-100) 100), pure MinusInfinity, pure PlusInfinity]
   maxError <- forAll $ Gen.double (Range.constantFrom 0.01 0 1)
-  maxSteps <- forAll $ Gen.integral (Range.constantFrom 500 100 10000)
+  maxSteps <- forAll $ Gen.integral (Range.constantFrom 2000 100 10000)
 
   let test = testEval maxError maxSteps lowerB upperB func
   annotate $ "func=" ++ show expr
