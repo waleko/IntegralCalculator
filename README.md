@@ -7,7 +7,7 @@
 
 <p>Simple integral calculator in Haskell</p>
 
-[![GitHub Workflow Status](https://img.shields.io/github/workflow/status/waleko/IntegralCalculator/IntegralCalculator%20Haskell%20App?style=flat-square)](https://github.com/waleko/IntegralCalculator/actions)
+[![GitHub Workflow Status (with branch)](https://img.shields.io/github/actions/workflow/status/waleko/calcigral/test.yml?branch=master&style=flat-square)](https://github.com/waleko/IntegralCalculator/actions)
 [![GitHub top language](https://img.shields.io/github/languages/top/waleko/IntegralCalculator?logo=github&style=flat-square&color=%235e5086)](https://github.com/waleko/wiki-race)
 [![license](https://img.shields.io/github/license/waleko/IntegralCalculator?style=flat-square)](./LICENSE)
 
